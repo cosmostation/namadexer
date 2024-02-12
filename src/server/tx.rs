@@ -82,8 +82,7 @@ pub struct TxInfo {
     /// The transaction code. Match what is in the checksum.js
     #[serde(serialize_with = "serialize_optional_hex")]
     code: Option<Vec<u8>>,
-    #[serde(serialize_with = "serialize_optional_hex")]
-    data: Option<Vec<u8>>,
+    data: Option<serde_json::Value>,
     /// Inner transaction type
     tx: Option<TxDecoded>,
 }
@@ -101,7 +100,7 @@ impl TxInfo {
         hex::encode(code)
     }
 
-    pub fn data(&self) -> Vec<u8> {
+    pub fn data(&self) -> serde_json::Value {
         self.data.clone().unwrap_or_default()
     }
 
@@ -109,69 +108,6 @@ impl TxInfo {
         self.tx = Some(tx_decoded);
     }
 
-    pub fn decode_tx(&mut self, checksums: &HashMap<String, String>) -> Result<(), Error> {
-        if self.is_decrypted() {
-            let Some(type_tx) = checksums.get(&self.code()) else {
-                return Err(Error::InvalidTxData);
-            };
-
-            let decoded = match type_tx.as_str() {
-                "tx_transfer" => {
-                    token::Transfer::try_from_slice(&self.data()).map(TxDecoded::Transfer)?
-                }
-                "tx_bond" => Bond::try_from_slice(&self.data()).map(TxDecoded::Bond)?,
-                "tx_reveal_pk" => {
-                    PublicKey::try_from_slice(&self.data()).map(TxDecoded::RevealPK)?
-                }
-                "tx_vote_proposal" => {
-                    VoteProposalData::try_from_slice(&self.data()).map(TxDecoded::VoteProposal)?
-                }
-                "tx_init_validator" => BecomeValidator::try_from_slice(&self.data())
-                    .map(|t| TxDecoded::BecomeValidator(Box::new(t)))?,
-                "tx_unbond" => Unbond::try_from_slice(&self.data()).map(TxDecoded::Unbond)?,
-                "tx_withdraw" => Withdraw::try_from_slice(&self.data()).map(TxDecoded::Withdraw)?,
-                "tx_init_account" => {
-                    InitAccount::try_from_slice(&self.data()).map(TxDecoded::InitAccount)?
-                }
-                "tx_update_account" => {
-                    // we could need to give users more context here on how the related accound
-                    // has been updated.
-                    UpdateAccount::try_from_slice(&self.data()).map(TxDecoded::UpdateAccount)?
-                }
-                "tx_resign_steward" => {
-                    Address::try_from_slice(&self.data()).map(TxDecoded::ResignSteward)?
-                }
-                "tx_update_steward_commission" => {
-                    // we could need to give users more context about this update.
-                    UpdateStewardCommission::try_from_slice(&self.data())
-                        .map(TxDecoded::UpdateStewardCommission)?
-                }
-                "tx_ibc" => Self::decode_ibc(&self.data()).map(TxDecoded::Ibc)?,
-                "tx_bridge_pool" => {
-                    PendingTransfer::try_from_slice(&self.data()).map(TxDecoded::EthPoolBridge)?
-                }
-                _ => {
-                    return Err(Error::InvalidTxData);
-                }
-            };
-
-            self.set_tx(decoded);
-
-            return Ok(());
-        }
-        Err(Error::InvalidTxData)
-    }
-
-    fn decode_ibc(tx_data: &[u8]) -> Result<IbcTx, Error> {
-        let msg = Any::decode(tx_data).map_err(|_| Error::InvalidTxData)?;
-        if msg.type_url.as_str() == MSG_TRANSFER_TYPE_URL
-            && MsgTransfer::try_from(msg.clone()).is_ok()
-        {
-            Ok(IbcTx::MsgTransfer(msg))
-        } else {
-            Ok(IbcTx::Any(msg))
-        }
-    }
 }
 
 impl TryFrom<Row> for TxInfo {
@@ -188,7 +124,7 @@ impl TryFrom<Row> for TxInfo {
         let fee_token = row.try_get("fee_token")?;
         let gas_limit_multiplier = row.try_get("gas_limit_multiplier")?;
         let code: Option<Vec<u8>> = row.try_get("code")?;
-        let data: Option<Vec<u8>> = row.try_get("data")?;
+        let data: Option<serde_json::Value> = row.try_get("data")?;
 
         Ok(Self {
             hash,
