@@ -47,7 +47,6 @@ fn server_routes(state: ServerState) -> Router<()> {
         .allow_origin(Any);
 
     Router::new()
-        .layer(cors)
         .route("/block/height/:block_height", get(get_block_by_height))
         .route("/block/hash/:block_hash", get(get_block_by_hash))
         .route("/block/last", get(get_last_block))
@@ -60,6 +59,7 @@ fn server_routes(state: ServerState) -> Router<()> {
             get(get_validator_uptime),
         )
         .with_state(state)
+        .layer(cors)
 }
 
 /// Returns a http server as a future so it needs to be pulled to start processing
