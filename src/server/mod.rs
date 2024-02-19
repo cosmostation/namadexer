@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{http::Method, routing::get, Router};
 
 #[cfg(feature = "prometheus")]
 use axum_prometheus::{PrometheusMetricLayerBuilder, AXUM_HTTP_REQUESTS_DURATION_SECONDS};
@@ -6,6 +6,7 @@ use futures_util::{Future, TryFutureExt};
 #[cfg(feature = "prometheus")]
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
 use std::{collections::HashMap, net::SocketAddr};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, instrument};
 
 use crate::config::ServerConfig;
@@ -41,6 +42,10 @@ pub struct ServerState {
 }
 
 fn server_routes(state: ServerState) -> Router<()> {
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET])
+        .allow_origin(Any);
+
     Router::new()
         .route("/block/height/:block_height", get(get_block_by_height))
         .route("/block/hash/:block_hash", get(get_block_by_hash))
@@ -54,6 +59,7 @@ fn server_routes(state: ServerState) -> Router<()> {
             get(get_validator_uptime),
         )
         .with_state(state)
+        .layer(cors)
 }
 
 /// Returns a http server as a future so it needs to be pulled to start processing
