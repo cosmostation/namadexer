@@ -31,6 +31,26 @@ pub async fn get_tx_by_hash(
     Ok(Json(Some(tx)))
 }
 
+pub async fn get_wrapped_tx_by_hash(
+    State(state): State<ServerState>,
+    Path(hash): Path<String>,
+) -> Result<Json<Option<TxInfo>>, Error> {
+    info!("calling /wrapped_tx/:tx_hash{}", hash);
+
+    let hash = hex::decode(hash)?;
+
+    let row = state.db.get_wrapped_tx(&hash).await?;
+    let Some(row) = row else {
+        return Ok(Json(None));
+    };
+    let mut tx = TxInfo::try_from(row)?;
+
+    // ignore the error for now
+    _ = tx.decode_tx(&state.checksums_map);
+
+    Ok(Json(Some(tx)))
+}
+
 // Return a list of the shielded assets and their total compiled using all the shielded transactions (in, internal and out)
 pub async fn get_shielded_tx(
     State(state): State<ServerState>,

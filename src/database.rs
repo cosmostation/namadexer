@@ -1181,6 +1181,22 @@ impl Database {
     }
 
     #[instrument(skip(self))]
+    /// Returns Transaction identified by hash
+    pub async fn get_wrapped_tx(&self, hash: &[u8]) -> Result<Option<Row>, Error> {
+        // query for transaction with hash
+        let str = format!(
+            "SELECT * FROM {}.{TX_TABLE_NAME} WHERE wrapped_id=$1",
+            self.network
+        );
+
+        query(&str)
+            .bind(hash)
+            .fetch_optional(&*self.pool)
+            .await
+            .map_err(Error::from)
+    }
+
+    #[instrument(skip(self))]
     /// Returns all the tx hashes for a block
     pub async fn get_tx_hashes_block(&self, hash: &[u8]) -> Result<Vec<Row>, Error> {
         // query for all tx hash that are in a block identified by the block_id
