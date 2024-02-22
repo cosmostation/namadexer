@@ -1185,7 +1185,7 @@ impl Database {
     pub async fn get_wrapped_tx(&self, hash: &[u8]) -> Result<Option<Row>, Error> {
         // query for transaction with hash
         let str = format!(
-            "SELECT * FROM {}.{TX_TABLE_NAME} WHERE wrapped_id=$1",
+            "SELECT * FROM {}.{TX_TABLE_NAME} WHERE wrapper_id=$1",
             self.network
         );
 
